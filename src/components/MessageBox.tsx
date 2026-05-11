@@ -189,11 +189,16 @@ const MessageBox = ({
 
                 {loading && isLast ? null : (
                   <div className="flex flex-row items-center justify-between w-full text-black dark:text-white py-4">
-                    <div className="flex flex-row items-center -ml-2">
+                    <div className="flex flex-row items-center space-x-2 -ml-2">
                       <Rewrite
                         rewrite={rewrite}
                         messageId={section.message.messageId}
                       />
+                      {section.message.chatModel && section.message.chatModel.key && (
+                        <span className="text-xs text-black/70 dark:text-white/70">
+                          {section.message.chatModel.key}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-row items-center -mr-2">
                       <Copy initialMessage={parsedMessage} section={section} />

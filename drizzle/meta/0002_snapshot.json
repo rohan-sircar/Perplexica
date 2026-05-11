@@ -103,14 +103,22 @@
           "autoincrement": false,
           "default": "'[]'"
         },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false,
-          "default": "'answering'"
-        }
+       "status": {
+            "name": "status",
+            "type": "text",
+            "primaryKey": false,
+            "notNull": false,
+            "autoincrement": false,
+            "default": "'answering'"
+          },
+          "chatModel": {
+            "name": "chatModel",
+            "type": "text",
+            "primaryKey": false,
+            "notNull": false,
+            "autoincrement": false,
+            "default": "'{}'"
+          }
       },
       "indexes": {},
       "foreignKeys": {},

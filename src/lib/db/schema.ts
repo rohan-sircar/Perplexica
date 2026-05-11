@@ -16,6 +16,9 @@ export const messages = sqliteTable('messages', {
   status: text({ enum: ['answering', 'completed', 'error'] }).default(
     'answering',
   ),
+  chatModel: text('chatModel', { mode: 'json' })
+    .$type<{ key: string; providerId: string }>()
+    .default(sql`'{}'`),
 });
 
 interface DBFile {

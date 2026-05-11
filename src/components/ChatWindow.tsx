@@ -20,6 +20,7 @@ export interface Message extends BaseMessage {
   query: string;
   responseBlocks: Block[];
   status: 'answering' | 'completed' | 'error';
+  chatModel?: { key: string; providerId: string };
 }
 
 export interface File {

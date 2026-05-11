@@ -191,6 +191,7 @@ export const POST = async (req: Request) => {
           encoder.encode(
             JSON.stringify({
               type: 'messageEnd',
+              data: data,
             }) + '\n',
           ),
         );
@@ -222,6 +223,8 @@ export const POST = async (req: Request) => {
         mode: body.optimizationMode,
         fileIds: body.files,
         systemInstructions: body.systemInstructions || 'None',
+        modelKey: body.chatModel.key,
+        providerId: body.chatModel.providerId,
       },
     });
 

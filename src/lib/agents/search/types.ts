@@ -13,6 +13,8 @@ export type SearchAgentConfig = {
   embedding: BaseEmbedding<any>;
   mode: 'speed' | 'balanced' | 'quality';
   systemInstructions: string;
+  modelKey?: string;
+  providerId?: string;
 };
 
 export type SearchAgentInput = {

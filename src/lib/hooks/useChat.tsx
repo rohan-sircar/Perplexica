@@ -655,7 +655,13 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setMessages((prev) =>
           prev.map((msg) =>
             msg.messageId === messageId
-              ? { ...msg, status: 'completed' as const }
+              ? {
+                  ...msg,
+                  status: 'completed' as const,
+                  chatModel: data.data
+                    ? { key: data.data.modelKey, providerId: data.data.providerId }
+                    : undefined,
+                }
               : msg,
           ),
         );

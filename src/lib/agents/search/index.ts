@@ -171,13 +171,20 @@ class SearchAgent {
       }
     }
 
-    session.emit('end', {});
+    session.emit('end', {
+      modelKey: input.config.modelKey,
+      providerId: input.config.providerId,
+    });
 
     await db
       .update(messages)
       .set({
         status: 'completed',
         responseBlocks: session.getAllBlocks(),
+        chatModel: {
+          key: input.config.modelKey ?? '',
+          providerId: input.config.providerId ?? '',
+        },
       })
       .where(
         and(
