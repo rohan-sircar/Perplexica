@@ -174,6 +174,8 @@ class SearchAgent {
     session.emit('end', {
       modelKey: input.config.modelKey,
       providerId: input.config.providerId,
+      embeddingModelKey: input.config.embeddingModelKey,
+      embeddingProviderId: input.config.embeddingProviderId,
     });
 
     await db
@@ -184,6 +186,10 @@ class SearchAgent {
         chatModel: {
           key: input.config.modelKey ?? '',
           providerId: input.config.providerId ?? '',
+        },
+        embeddingModel: {
+          key: input.config.embeddingModelKey ?? '',
+          providerId: input.config.embeddingProviderId ?? '',
         },
       })
       .where(

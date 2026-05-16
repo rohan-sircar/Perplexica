@@ -225,6 +225,8 @@ export const POST = async (req: Request) => {
         systemInstructions: body.systemInstructions || 'None',
         modelKey: body.chatModel.key,
         providerId: body.chatModel.providerId,
+        embeddingModelKey: body.embeddingModel.key,
+        embeddingProviderId: body.embeddingModel.providerId,
       },
     });
 

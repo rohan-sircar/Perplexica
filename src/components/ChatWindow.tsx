@@ -21,6 +21,7 @@ export interface Message extends BaseMessage {
   responseBlocks: Block[];
   status: 'answering' | 'completed' | 'error';
   chatModel?: { key: string; providerId: string };
+  embeddingModel?: { key: string; providerId: string };
 }
 
 export interface File {

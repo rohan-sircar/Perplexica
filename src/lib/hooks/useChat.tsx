@@ -661,6 +661,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                   chatModel: data.data
                     ? { key: data.data.modelKey, providerId: data.data.providerId }
                     : undefined,
+                  embeddingModel: data.data
+                    ? {
+                        key: data.data.embeddingModelKey,
+                        providerId: data.data.embeddingProviderId,
+                      }
+                    : undefined,
                 }
               : msg,
           ),

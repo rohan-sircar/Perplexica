@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1c5eb804-d6b4-48ec-9a8f-75fb729c8e52",
-  "prevId": "6dedf55f-0e44-478f-82cf-14a21ac686f8",
+  "id": "b7f8e9a1-2c3d-4e5f-6a7b-8c9d0e1f2a3b",
+  "prevId": "1c5eb804-d6b4-48ec-9a8f-75fb729c9e52",
   "tables": {
     "chats": {
       "name": "chats",
@@ -103,30 +103,30 @@
           "autoincrement": false,
           "default": "'[]'"
         },
-       "status": {
-            "name": "status",
-            "type": "text",
-            "primaryKey": false,
-            "notNull": false,
-            "autoincrement": false,
-            "default": "'answering'"
-          },
-          "chatModel": {
-            "name": "chatModel",
-            "type": "text",
-            "primaryKey": false,
-            "notNull": false,
-            "autoincrement": false,
-            "default": "'{}'"
-          },
-          "embeddingModel": {
-            "name": "embeddingModel",
-            "type": "text",
-            "primaryKey": false,
-            "notNull": false,
-            "autoincrement": false,
-            "default": "'{}'"
-          }
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'answering'"
+        },
+        "chatModel": {
+          "name": "chatModel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'{}'"
+        },
+        "embeddingModel": {
+          "name": "embeddingModel",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false,
+          "default": "'{}'"
+        }
       },
       "indexes": {},
       "foreignKeys": {},

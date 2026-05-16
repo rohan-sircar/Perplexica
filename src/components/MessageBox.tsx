@@ -200,7 +200,12 @@ const MessageBox = ({
                         </span>
                       )}
                     </div>
-                    <div className="flex flex-row items-center -mr-2">
+                    <div className="flex flex-row items-center space-x-2 -mr-2">
+                      {section.message.embeddingModel && section.message.embeddingModel.key && (
+                        <span className="text-xs text-black/70 dark:text-white/70">
+                          {section.message.embeddingModel.key}
+                        </span>
+                      )}
                       <Copy initialMessage={parsedMessage} section={section} />
                       <button
                         onClick={() => {

@@ -15,6 +15,8 @@ export type SearchAgentConfig = {
   systemInstructions: string;
   modelKey?: string;
   providerId?: string;
+  embeddingModelKey?: string;
+  embeddingProviderId?: string;
 };
 
 export type SearchAgentInput = {

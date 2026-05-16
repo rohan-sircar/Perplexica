@@ -19,6 +19,9 @@ export const messages = sqliteTable('messages', {
   chatModel: text('chatModel', { mode: 'json' })
     .$type<{ key: string; providerId: string }>()
     .default(sql`'{}'`),
+  embeddingModel: text('embeddingModel', { mode: 'json' })
+    .$type<{ key: string; providerId: string }>()
+    .default(sql`'{}'`),
 });
 
 interface DBFile {
