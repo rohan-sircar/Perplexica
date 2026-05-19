@@ -23,7 +23,7 @@ export class StreamingTTSPlayer {
       if (introText && introText.trim()) {
         await this.playSegment(introText, voice, model, speed);
       }
-      await this.playSegment(text, voice, model, speed);
+      await this.playSegment(stripMarkdownHeaders(text), voice, model, speed);
     } finally {
       this.isGenerating = false;
     }
@@ -181,4 +181,8 @@ async function fetchTTSConfig(): Promise<{
   } catch {
     return { voice: 'af_aoede', model: 'kokoro', introText: '' };
   }
+}
+
+function stripMarkdownHeaders(text: string): string {
+  return text.replace(/^#+\s+/gm, '');
 }
