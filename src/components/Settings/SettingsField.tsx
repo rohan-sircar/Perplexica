@@ -384,7 +384,7 @@ const SettingsField = ({
         />
       );
     default:
-      return <div>Unsupported field type: {field.type}</div>;
+      return <div>Unsupported field type: {(field as any).type}</div>;
   }
 };
 
