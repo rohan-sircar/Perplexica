@@ -6,6 +6,7 @@ class PCMProcessor extends AudioWorkletProcessor {
     this.volume = 0.5;
     this.fadeSamples = 720;
     this.fadeIndex = 0;
+    this.fadingOut = false;
 
     this.port.onmessage = (event) => {
       if (event.data.pcmData && !this.buffering) {
@@ -26,10 +27,12 @@ class PCMProcessor extends AudioWorkletProcessor {
 
       if (event.data.flushDone) {
         this.buffering = false;
+        this.fadingOut = true;
       }
 
       if (event.data.resetFade) {
         this.fadeIndex = 0;
+        this.fadingOut = false;
       }
     };
   }
@@ -46,6 +49,9 @@ class PCMProcessor extends AudioWorkletProcessor {
           const normalized = this.fadeIndex / this.fadeSamples;
           gain = Math.pow(normalized, 3);
           this.fadeIndex++;
+        } else if (this.fadingOut && this.samples.length < this.fadeSamples) {
+          const normalized = this.samples.length / this.fadeSamples;
+          gain = Math.pow(normalized, 3);
         }
         channelData[i] = sample * gain * this.volume;
       }
