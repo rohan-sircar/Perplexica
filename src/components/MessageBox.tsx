@@ -18,7 +18,7 @@ import Rewrite from './MessageActions/Rewrite';
 import MessageSources from './MessageSources';
 import SearchImages from './SearchImages';
 import SearchVideos from './SearchVideos';
-import { useSpeech } from 'react-text-to-speech';
+import { StreamingTTSPlayer } from '@/lib/tts/player';
 import ThinkBox from './ThinkBox';
 import { useChat, Section } from '@/lib/hooks/useChat';
 import Citation from './MessageRenderer/Citation';
@@ -72,7 +72,78 @@ const MessageBox = ({
 
   const hasContent = section.parsedTextBlocks.length > 0;
 
-  const { speechStatus, start, stop } = useSpeech({ text: speechMessage });
+  const [ttsEnabled, setTtsEnabled] = React.useState(false);
+  const [autoNarrate, setAutoNarrate] = React.useState(false);
+
+  React.useEffect(() => {
+    fetch('/api/config')
+      .then((res) => res.json())
+      .then((data) => {
+        setTtsEnabled(data.values?.tts?.enabled ?? false);
+        setAutoNarrate(data.values?.tts?.autoNarrate ?? false);
+      })
+      .catch(() => {});
+  }, []);
+
+  const playerRef = React.useRef<StreamingTTSPlayer | null>(null);
+
+  if (!playerRef.current) {
+    playerRef.current = new StreamingTTSPlayer();
+  }
+
+  React.useEffect(() => {
+    return () => {
+      playerRef.current?.stop();
+    };
+  }, []);
+
+  const autoNarrateRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (isLast && researchEnded && hasContent && ttsEnabled && autoNarrate && !loading) {
+      if (!autoNarrateRef.current) {
+        autoNarrateRef.current = true;
+        setIsTTSPlaying(true);
+        playerRef.current!.play(speechMessage).catch((err) => {
+          console.error('Auto-narration error:', err);
+          setIsTTSPlaying(false);
+          autoNarrateRef.current = false;
+        });
+      }
+    } else if (!isLast || !researchEnded || loading) {
+      autoNarrateRef.current = false;
+    }
+  }, [isLast, researchEnded, hasContent, ttsEnabled, autoNarrate, loading, speechMessage]);
+
+  const [isTTSPlaying, setIsTTSPlaying] = React.useState(false);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      if (playerRef.current) {
+        const playing = playerRef.current.isPlaying;
+        if (playing !== isTTSPlaying) {
+          setIsTTSPlaying(playing);
+        }
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [isTTSPlaying]);
+
+  const handleTTS = async () => {
+    if (playerRef.current!.isPlaying) {
+      playerRef.current!.stop();
+      setIsTTSPlaying(false);
+      return;
+    }
+
+    try {
+      await playerRef.current!.play(speechMessage);
+      setIsTTSPlaying(false);
+    } catch (err) {
+      console.error('TTS error:', err);
+      setIsTTSPlaying(false);
+    }
+  };
 
   const markdownOverrides: MarkdownToJSX.Options = {
     renderRule(next, node, renderChildren, state) {
@@ -207,22 +278,22 @@ const MessageBox = ({
                         </span>
                       )}
                       <Copy initialMessage={parsedMessage} section={section} />
-                      <button
-                        onClick={() => {
-                          if (speechStatus === 'started') {
-                            stop();
-                          } else {
-                            start();
-                          }
-                        }}
-                        className="p-2 text-black/70 dark:text-white/70 rounded-full hover:bg-light-secondary dark:hover:bg-dark-secondary transition duration-200 hover:text-black dark:hover:text-white"
+                      {ttsEnabled && (
+                        <button
+                          onClick={handleTTS}
+                        className={`p-2 rounded-full transition duration-200 hover:text-black dark:hover:text-white ${
+                          isTTSPlaying
+                            ? 'text-sky-500 bg-sky-500/10 ring-1 ring-sky-500/30'
+                            : 'text-black/70 dark:text-white/70 hover:bg-light-secondary dark:hover:bg-dark-secondary'
+                        }`}
                       >
-                        {speechStatus === 'started' ? (
+                        {isTTSPlaying ? (
                           <StopCircle size={16} />
                         ) : (
                           <Volume2 size={16} />
                         )}
                       </button>
+                      )}
                     </div>
                   </div>
                 )}
