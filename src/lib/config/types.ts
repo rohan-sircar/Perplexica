@@ -73,8 +73,14 @@ type Config = {
   search: {
     [key: string]: any;
   };
-  tts?: {
-    [key: string]: any;
+  tts: {
+    enabled: boolean;
+    autoNarrate: boolean;
+    introText: string;
+    baseURL: string;
+    apiKey: string;
+    model: string;
+    voice: string;
   };
 };
 

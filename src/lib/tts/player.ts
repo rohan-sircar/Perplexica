@@ -15,15 +15,25 @@ export class StreamingTTSPlayer {
     const voice = options?.voice || ttsConfig.voice;
     const model = options?.model || ttsConfig.model;
     const speed = options?.speed ?? 1.0;
+    const introText = ttsConfig.introText;
 
     this.isGenerating = true;
-    return new Promise<void>((resolve, reject) => {
-      this.playSegment(text, voice, model, speed).then(resolve).catch(reject);
-    });
+
+    try {
+      if (introText && introText.trim()) {
+        await this.playSegment(introText, voice, model, speed);
+      }
+      await this.playSegment(text, voice, model, speed);
+    } finally {
+      this.isGenerating = false;
+    }
   }
 
   private async initAudioWorklet() {
-    if (this.audioContext) return;
+    if (this.audioContext) {
+      await this.audioContext.resume();
+      return;
+    }
 
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
       sampleRate: 24000,
@@ -33,6 +43,37 @@ export class StreamingTTSPlayer {
     await this.audioContext.audioWorklet.addModule(processorUrl);
     this.audioWorkletNode = new AudioWorkletNode(this.audioContext, 'pcm-processor');
     this.audioWorkletNode.connect(this.audioContext.destination);
+    await this.audioContext.resume();
+  }
+
+  private waitForDrain(node: AudioWorkletNode, timeoutMs = 10000): Promise<void> {
+    return new Promise<void>((resolve) => {
+      if (this.isStopping) { resolve(); return; }
+      const startTime = Date.now();
+
+      const handler = (event: MessageEvent) => {
+        if (event.data.count !== undefined) {
+          if (event.data.count === 0) {
+            node.port.removeEventListener('message', handler);
+            resolve();
+          } else {
+            setTimeout(() => {
+              if (!this.isStopping) {
+                node.port.postMessage({ getCount: true });
+              }
+            }, 30);
+          }
+        }
+      };
+
+      node.port.addEventListener('message', handler);
+      node.port.postMessage({ getCount: true });
+
+      setTimeout(() => {
+        node.port.removeEventListener('message', handler);
+        resolve();
+      }, timeoutMs);
+    });
   }
 
   private async playSegment(
@@ -90,36 +131,11 @@ export class StreamingTTSPlayer {
       this.audioWorkletNode!.port.postMessage({ pcmData });
     }
 
-    // Signal worklet that streaming is done. It won't accept new data
-    // until the current samples have been fully consumed by process().
+    // Signal worklet that streaming is done
     this.audioWorkletNode!.port.postMessage({ flushDone: true });
 
     // Wait for all queued samples to drain
-    await new Promise<void>((resolve) => {
-      if (this.isStopping) { resolve(); return; }
-      const startTime = Date.now();
-      const poll = () => {
-        if (this.isStopping || Date.now() - startTime > 10000) {
-          resolve();
-          return;
-        }
-        this.audioWorkletNode!.port.postMessage({ getCount: true });
-      };
-      poll();
-
-      let resolved = false;
-      const onCountMessage = (event: MessageEvent) => {
-        if (resolved) return;
-        if (event.data.count !== undefined && event.data.count === 0) {
-          resolved = true;
-          this.audioWorkletNode!.port.removeEventListener('message', onCountMessage);
-          resolve();
-        } else if (event.data.count !== undefined) {
-          setTimeout(poll, 30);
-        }
-      };
-      this.audioWorkletNode!.port.addEventListener('message', onCountMessage);
-    });
+    await this.waitForDrain(this.audioWorkletNode!);
   }
 
   stop(): void {
@@ -151,6 +167,7 @@ export class StreamingTTSPlayer {
 async function fetchTTSConfig(): Promise<{
   voice: string;
   model: string;
+  introText: string;
 }> {
   try {
     const res = await fetch('/api/config');
@@ -159,8 +176,9 @@ async function fetchTTSConfig(): Promise<{
     return {
       voice: tts.voice || 'af_aoede',
       model: tts.model || 'kokoro',
+      introText: tts.introText || '',
     };
   } catch {
-    return { voice: 'af_aoede', model: 'kokoro' };
+    return { voice: 'af_aoede', model: 'kokoro', introText: '' };
   }
 }
