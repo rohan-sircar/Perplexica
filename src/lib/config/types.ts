@@ -81,6 +81,7 @@ type Config = {
     apiKey: string;
     model: string;
     voice: string;
+    segmentLength?: number;
   };
 };
 

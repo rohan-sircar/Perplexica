@@ -27,6 +27,7 @@ class ConfigManager {
       apiKey: '',
       model: 'kokoro',
       voice: 'af_aoede',
+      segmentLength: 200,
     },
   };
   uiConfigSections: UIConfigSections = {
@@ -192,6 +193,16 @@ class ConfigManager {
         default: 'af_aoede',
         scope: 'server',
       },
+      {
+        name: 'Segment length',
+        key: 'segmentLength',
+        type: 'string',
+        required: false,
+        description: 'Target maximum characters per TTS segment. Shorter segments reduce latency but increase API calls.',
+        placeholder: '200',
+        default: '200',
+        scope: 'server',
+      },
     ],
   };
 
@@ -256,6 +267,7 @@ class ConfigManager {
         apiKey: '',
         model: 'kokoro',
         voice: 'af_aoede',
+        segmentLength: 200,
       };
     }
     return config;

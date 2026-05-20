@@ -1,6 +1,11 @@
+type AudioJob = { audioBlob: Blob };
+
 export class StreamingTTSPlayer {
   private audioContext: AudioContext | null = null;
-  private audioWorkletNode: AudioWorkletNode | null = null;
+  private audioJobQueue: AudioJob[] = [];
+  private currentSource: AudioBufferSourceNode | null = null;
+  private currentAudioJob: AudioJob | null = null;
+  private audioReady = true;
   private isStopping = false;
   private abortController: AbortController | null = null;
   isGenerating = false;
@@ -9,83 +14,86 @@ export class StreamingTTSPlayer {
     text: string,
     options?: { voice?: string; model?: string; speed?: number },
   ): Promise<void> {
-    this.stop();
+    await this.stop();
+    this.isStopping = false;
 
     const ttsConfig = await fetchTTSConfig();
     const voice = options?.voice || ttsConfig.voice;
     const model = options?.model || ttsConfig.model;
     const speed = options?.speed ?? 1.0;
     const introText = ttsConfig.introText;
+    const segmentLength = Number(ttsConfig.segmentLength) || 200;
 
     this.isGenerating = true;
 
     try {
       const content = stripMarkdownHeaders(text);
-      const combined = introText && introText.trim()
-        ? introText.trim() + ' ' + content
-        : content;
-      await this.playSegment(combined, voice, model, speed);
+
+      const segments: string[] = [];
+      if (introText?.trim()) {
+        segments.push(...this.splitTextIntoSegments(introText.trim(), segmentLength));
+      }
+      segments.push(...this.splitTextIntoSegments(content, segmentLength));
+
+      let lastError: Error | null = null;
+      for (let i = 0; i < segments.length; i++) {
+        if (this.isStopping) return;
+        try {
+          await this.generateAndQueueAudio(segments[i], voice, model, speed);
+          this.processAudioJobQueue();
+        } catch (err) {
+          lastError = err as Error;
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
     } finally {
       this.isGenerating = false;
     }
   }
 
-  private async initAudioWorklet() {
-    if (this.audioContext) {
-      await this.audioContext.resume();
-      return;
-    }
+  private splitTextIntoSegments(text: string, maxChars: number): string[] {
+    const segments: string[] = [];
+    if (!text || !text.trim()) return segments;
 
-    this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-      sampleRate: 24000,
-    });
+    const boundaryRegex = /(?<=[.!?]\s)|\n{1,2}/g;
+    const parts = text.split(boundaryRegex);
 
-    const processorUrl = '/scripts/extensions/tts/lib/pcm-processor.js';
-    await this.audioContext.audioWorklet.addModule(processorUrl);
-    this.audioWorkletNode = new AudioWorkletNode(this.audioContext, 'pcm-processor');
-    this.audioWorkletNode.connect(this.audioContext.destination);
-    await this.audioContext.resume();
-  }
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
 
-  private waitForDrain(node: AudioWorkletNode, timeoutMs = 10000): Promise<void> {
-    return new Promise<void>((resolve) => {
-      if (this.isStopping) { resolve(); return; }
-
-      const handler = (event: MessageEvent) => {
-        if (event.data.count !== undefined) {
-          if (event.data.count === 0) {
-            node.port.removeEventListener('message', handler);
-            resolve();
+      if (trimmed.length > maxChars) {
+        const words = trimmed.split(/\s+/);
+        let current = '';
+        for (const word of words) {
+          if ((current + ' ' + word).trim().length > maxChars && current.trim()) {
+            segments.push(current.trim());
+            current = word;
           } else {
-            setTimeout(() => {
-              if (!this.isStopping) {
-                node.port.postMessage({ getCount: true });
-              }
-            }, 30);
+            current = current ? current + ' ' + word : word;
           }
         }
-      };
+        if (current.trim()) {
+          segments.push(current.trim());
+        }
+      } else {
+        segments.push(trimmed);
+      }
+    }
 
-      node.port.addEventListener('message', handler);
-      node.port.postMessage({ getCount: true });
-
-      setTimeout(() => {
-        node.port.removeEventListener('message', handler);
-        resolve();
-      }, timeoutMs);
-    });
+    return segments.filter(s => s.length > 0);
   }
 
-  private async playSegment(
+  private async generateAndQueueAudio(
     text: string,
     voice: string,
     model: string,
     speed: number,
   ): Promise<void> {
-    await this.initAudioWorklet();
-
     this.abortController = new AbortController();
-    this.audioWorkletNode!.port.postMessage({ resetFade: true });
 
     let response;
     try {
@@ -107,32 +115,63 @@ export class StreamingTTSPlayer {
       throw new Error(error.message || 'TTS generation failed.');
     }
 
-    let headerParsed = false;
-    const reader = response.body!.getReader();
-
-    while (true) {
-      if (this.isStopping) return;
-      let result: ReadableStreamReadResult<Uint8Array>;
-      try {
-        result = await reader.read();
-      } catch (err) {
-        if ((err as DOMException).name === 'AbortError') return;
-        throw err;
-      }
-      const { done, value: chunk } = result;
-      if (done) break;
-
-      const pcmData = headerParsed ? chunk : chunk.slice(44);
-      headerParsed = true;
-
-      this.audioWorkletNode!.port.postMessage({ pcmData });
-    }
-
-    this.audioWorkletNode!.port.postMessage({ flushDone: true });
-    await this.waitForDrain(this.audioWorkletNode!);
+    const audioBlob = await response.blob();
+    this.audioJobQueue.push({ audioBlob });
   }
 
-  stop(): void {
+  private processAudioJobQueue() {
+    if (this.audioJobQueue.length === 0 || !this.audioReady || this.isStopping) {
+      return;
+    }
+
+    this.audioReady = false;
+    this.currentAudioJob = this.audioJobQueue.shift()!;
+    this.playAudioBuffer(this.currentAudioJob.audioBlob);
+  }
+
+  private async playAudioBuffer(blob: Blob) {
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+    const ctx = this.audioContext;
+
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+    const source = ctx.createBufferSource();
+    source.buffer = audioBuffer;
+
+    const fadeDuration = 0.03;
+    const gainNode = ctx.createGain();
+    gainNode.gain.setValueAtTime(1, ctx.currentTime);
+
+    const segmentEnd = audioBuffer.duration - fadeDuration;
+    if (segmentEnd > 0) {
+      gainNode.gain.linearRampToValueAtTime(1, ctx.currentTime + segmentEnd);
+    }
+    gainNode.gain.linearRampToValueAtTime(0, ctx.currentTime + audioBuffer.duration);
+
+    source.connect(gainNode).connect(ctx.destination);
+    this.currentSource = source;
+
+    source.onended = () => {
+      this.currentSource = null;
+      this.completeCurrentAudioJob();
+    };
+
+    source.start();
+  }
+
+  private completeCurrentAudioJob() {
+    this.audioReady = true;
+    this.currentAudioJob = null;
+
+    if (this.audioJobQueue.length > 0) {
+      this.processAudioJobQueue();
+    }
+  }
+
+  async stop(): Promise<void> {
     this.isStopping = true;
 
     if (this.abortController) {
@@ -140,20 +179,24 @@ export class StreamingTTSPlayer {
       this.abortController = null;
     }
 
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
-      this.audioWorkletNode = null;
+    if (this.currentSource) {
+      try {
+        this.currentSource.stop();
+      } catch { /* already stopped */ }
+      this.currentSource = null;
     }
 
+    this.audioJobQueue.splice(0, this.audioJobQueue.length);
+    this.currentAudioJob = null;
+    this.audioReady = true;
     this.isGenerating = false;
-    this.isStopping = false;
   }
 
   get isPlaying(): boolean {
-    return this.isGenerating || (
-      this.audioContext !== null && this.audioContext.state !== 'closed'
-    );
+    return this.isGenerating ||
+      this.audioJobQueue.length > 0 ||
+      this.currentAudioJob !== null ||
+      (this.currentSource !== null);
   }
 }
 
@@ -161,6 +204,7 @@ async function fetchTTSConfig(): Promise<{
   voice: string;
   model: string;
   introText: string;
+  segmentLength: number;
 }> {
   try {
     const res = await fetch('/api/config');
@@ -170,9 +214,10 @@ async function fetchTTSConfig(): Promise<{
       voice: tts.voice || 'af_aoede',
       model: tts.model || 'kokoro',
       introText: tts.introText || '',
+      segmentLength: Number(tts.segmentLength) || 200,
     };
   } catch {
-    return { voice: 'af_aoede', model: 'kokoro', introText: '' };
+    return { voice: 'af_aoede', model: 'kokoro', introText: '', segmentLength: 200 };
   }
 }
 
