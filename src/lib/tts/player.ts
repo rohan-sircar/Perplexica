@@ -20,10 +20,11 @@ export class StreamingTTSPlayer {
     this.isGenerating = true;
 
     try {
-      if (introText && introText.trim()) {
-        await this.playSegment(introText, voice, model, speed);
-      }
-      await this.playSegment(stripMarkdownHeaders(text), voice, model, speed);
+      const content = stripMarkdownHeaders(text);
+      const combined = introText && introText.trim()
+        ? introText.trim() + ' ' + content
+        : content;
+      await this.playSegment(combined, voice, model, speed);
     } finally {
       this.isGenerating = false;
     }
@@ -49,7 +50,6 @@ export class StreamingTTSPlayer {
   private waitForDrain(node: AudioWorkletNode, timeoutMs = 10000): Promise<void> {
     return new Promise<void>((resolve) => {
       if (this.isStopping) { resolve(); return; }
-      const startTime = Date.now();
 
       const handler = (event: MessageEvent) => {
         if (event.data.count !== undefined) {
@@ -85,8 +85,6 @@ export class StreamingTTSPlayer {
     await this.initAudioWorklet();
 
     this.abortController = new AbortController();
-
-    // Reset fade counter for new segment
     this.audioWorkletNode!.port.postMessage({ resetFade: true });
 
     let response;
@@ -124,24 +122,19 @@ export class StreamingTTSPlayer {
       const { done, value: chunk } = result;
       if (done) break;
 
-      // Skip WAV header on first chunk only
       const pcmData = headerParsed ? chunk : chunk.slice(44);
       headerParsed = true;
 
       this.audioWorkletNode!.port.postMessage({ pcmData });
     }
 
-    // Signal worklet that streaming is done
     this.audioWorkletNode!.port.postMessage({ flushDone: true });
-
-    // Wait for all queued samples to drain
     await this.waitForDrain(this.audioWorkletNode!);
   }
 
   stop(): void {
     this.isStopping = true;
 
-    // Cancel the in-flight fetch request to TTS server
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;

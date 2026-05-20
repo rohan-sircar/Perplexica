@@ -22,7 +22,7 @@ class ConfigManager {
     tts: {
       enabled: false,
       autoNarrate: false,
-      introText: 'Here is what I found.',
+      introText: 'Here is what I found.................',
       baseURL: 'http://localhost:8880/v1',
       apiKey: '',
       model: 'kokoro',
