@@ -159,7 +159,7 @@ class ConfigManager {
         required: false,
         description: 'The base URL of your TTS provider (e.g., http://localhost:8880/v1).',
         placeholder: 'https://api.openai.com/v1',
-        default: 'http://rohan-desktop-2:8880/v1',
+        default: 'http://localhost:8880/v1',
         scope: 'server',
       },
       {
