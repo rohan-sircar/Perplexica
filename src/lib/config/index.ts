@@ -247,7 +247,17 @@ class ConfigManager {
   }
 
   private migrateConfig(config: Config): Config {
-    /* TODO: Add migrations */
+    if (!config.tts) {
+      config.tts = {
+        enabled: false,
+        autoNarrate: false,
+        introText: 'Here is what I found.................',
+        baseURL: 'http://localhost:8880/v1',
+        apiKey: '',
+        model: 'kokoro',
+        voice: 'af_aoede',
+      };
+    }
     return config;
   }
 
